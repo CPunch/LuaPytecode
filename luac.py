@@ -28,7 +28,7 @@ lua_opcode_names = [
     "CLOSURE",  "VARARG"
 ]
 
-# at [p]osition size of k
+# at [p]osition to k
 def get_bits(num, p, k):
     # convert number into binary first 
     binary = bin(num) 
