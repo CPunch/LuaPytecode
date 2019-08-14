@@ -47,11 +47,7 @@ def get_bits(num, p, k):
     kBitSubStr = binary[start : end] 
 
     # convert extracted sub-string into decimal again 
-    return (int(kBitSubStr,2) % 256) 
-
-def get_bits_2(input, n):
-    pn = 2^(n-1)
-    return (input % (pn + pn) >= pn) and 1 or 0
+    return (int(kBitSubStr,2) % 256)
 
 class LuaCompiler:
     def __init__(self):
