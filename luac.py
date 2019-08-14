@@ -49,6 +49,10 @@ def get_bits(num, p, k):
     # convert extracted sub-string into decimal again 
     return (int(kBitSubStr,2) % 256) 
 
+def get_bits_2(input, n):
+    pn = 2^(n-1)
+    return (input % (pn + pn) >= pn) and 1 or 0
+
 class LuaCompiler:
     def __init__(self):
         self.luac = "luac5.1"
@@ -90,10 +94,13 @@ class LuaCompiler:
         self.index = self.index + self.size_t
         return s
 
-    def get_float(self):
-        f = struct.unpack('<f', bytearray(self.bytecode[self.index:self.index+8]))
+    def get_double(self):
+        if self.big_endian:
+            f = struct.unpack('>d', bytearray(self.bytecode[self.index:self.index+8]))
+        else:
+            f = struct.unpack('<d', bytearray(self.bytecode[self.index:self.index+8]))
         self.index = self.index + 8
-        return f
+        return f[0]
 
     def get_string(self, size):
         if (size == None):
@@ -169,7 +176,7 @@ class LuaCompiler:
             if constant['TYPE'] == 1:
                 constant['DATA'] = (self.get_byte() != 0);
             elif constant['TYPE'] == 3:
-                constant['DATA'] = self.get_float();
+                constant['DATA'] = self.get_double();
             elif constant['TYPE'] == 4:
                 constant['DATA'] = self.get_string(None)[:-1];
 
