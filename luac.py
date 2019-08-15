@@ -47,7 +47,7 @@ def get_bits(num, p, k):
     kBitSubStr = binary[start : end] 
 
     # convert extracted sub-string into decimal again 
-    return (int(kBitSubStr,2) % 256) 
+    return (int(kBitSubStr,2)) 
 
 class LuaCompiler:
     def __init__(self):
@@ -178,7 +178,7 @@ class LuaCompiler:
             elif instruction['TYPE'] == "ABx":
                 instruction['Bx'] = get_bits(data, 15, 32)
             elif instruction['TYPE'] == "AsBx":
-                instruction['sBx'] = get_bits(data, 15, 32) #- 131071
+                instruction['sBx'] = get_bits(data, 15, 32) - 131071
 
             chunk['INSTRUCTIONS'][i] = instruction
 
