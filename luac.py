@@ -47,7 +47,7 @@ def get_bits(num, p, k):
     kBitSubStr = binary[start : end] 
 
     # convert extracted sub-string into decimal again 
-    return (int(kBitSubStr,2) % 256)
+    return (int(kBitSubStr,2) % 256) 
 
 class LuaCompiler:
     def __init__(self):
@@ -55,8 +55,34 @@ class LuaCompiler:
         self.o_flag = "-o"
         self.temp_out = "out.luac"
         self.chunks = []
+        self.chunk = {}
         self.index = 0
 
+    @staticmethod
+    def dis_chunk(chunk):
+        print("==== [[" + str(chunk['NAME']) + "]] ====\n")
+        for z in chunk['PROTOTYPES']:
+            print("** decoding proto\n")
+            LuaCompiler.dis_chunk(chunk['PROTOTYPES'][z])
+        
+        print("\n==== [[" + str(chunk['NAME']) + "'s constants]] ====\n")
+        for z in chunk['CONSTANTS']:
+            i = chunk['CONSTANTS'][z]
+            print(str(z) + ": " + str(i['DATA']))
+
+        print("\n==== [[" + str(chunk['NAME']) + "'s dissassembly]] ====\n")
+
+        for z in chunk['INSTRUCTIONS']:
+            i = chunk['INSTRUCTIONS'][z]
+            if (i['TYPE'] == "ABC"):
+                print(lua_opcode_names[i['OPCODE']], i['A'], i['B'], i['C'])
+            elif (i['TYPE'] == "ABx"):
+                if (i['OPCODE'] == 1 or i['OPCODE'] == 5):
+                    print(lua_opcode_names[i['OPCODE']], i['A'], -i['Bx']-1, chunk['CONSTANTS'][i['Bx']]['DATA'])
+                else:
+                    print(lua_opcode_names[i['OPCODE']], i['A'], -i['Bx']-1)
+            elif (i['TYPE'] == "AsBx"):
+                print("AsBx", lua_opcode_names[i['OPCODE']], i['A'], i['sBx'])
 
     def get_byte(self):
         b = self.bytecode[self.index]
@@ -136,23 +162,23 @@ class LuaCompiler:
                 # opcode = opcode number;
                 # type   = [ABC, ABx, AsBx]
                 # A, B, C, Bx, or sBx depending on type
-            };
+            }
 
-            data   = self.get_int32();
-            opcode = get_bits(data, 1, 6);
-            tp   = lua_opcode_types[opcode];
+            data   = self.get_int32()
+            opcode = get_bits(data, 1, 6)
+            tp   = lua_opcode_types[opcode]
 
             instruction['OPCODE'] = opcode
             instruction['TYPE'] = tp
             instruction['A'] = get_bits(data, 7, 14)
 
             if instruction['TYPE'] == "ABC":
-                instruction['B'] = get_bits(data, 24, 32);
-                instruction['C'] = get_bits(data, 15, 23);
+                instruction['B'] = get_bits(data, 24, 32)
+                instruction['C'] = get_bits(data, 15, 23)
             elif instruction['TYPE'] == "ABx":
-                instruction['Bx'] = get_bits(data, 15, 32);
+                instruction['Bx'] = get_bits(data, 15, 32)
             elif instruction['TYPE'] == "AsBx":
-                instruction['sBx'] = get_bits(data, 15, 32) - 131071;
+                instruction['sBx'] = get_bits(data, 15, 32) #- 131071
 
             chunk['INSTRUCTIONS'][i] = instruction
 
@@ -161,20 +187,20 @@ class LuaCompiler:
         # get constants
         print("** DECODING CONSTANTS")
 
-        num = self.get_int();
+        num = self.get_int()
         for i in range(num):
             constant = {
                 # type = constant type;
                 # data = constant data;
-            };
+            }
             constant['TYPE'] = self.get_byte()
 
             if constant['TYPE'] == 1:
-                constant['DATA'] = (self.get_byte() != 0);
+                constant['DATA'] = (self.get_byte() != 0)
             elif constant['TYPE'] == 3:
-                constant['DATA'] = self.get_double();
+                constant['DATA'] = self.get_double()
             elif constant['TYPE'] == 4:
-                constant['DATA'] = self.get_string(None)[:-1];
+                constant['DATA'] = self.get_string(None)[:-1]
 
             print(constant)
             
@@ -184,7 +210,7 @@ class LuaCompiler:
 
         print("** DECODING PROTOS")
 
-        num = self.get_int();
+        num = self.get_int()
         for i in range(num):
             chunk['PROTOTYPES'][i] = self.decode_chunk()
 
@@ -192,21 +218,23 @@ class LuaCompiler:
         print("** DECODING DEBUG SYMBOLS")
 
         # line numbers
-        num = self.get_int();
+        num = self.get_int()
         for i in range(num):
             self.get_int32()
 
         # locals
-        num = self.get_int();
+        num = self.get_int()
         for i in range(num):
-            self.get_string(None)[:-1] # local name
+            print(self.get_string(None)[:-1]) # local name
             self.get_int32() # local start PC
             self.get_int32() # local end   PC
 
         # upvalues
-        num = self.get_int();
+        num = self.get_int()
         for i in range(num):
             self.get_string(None) # upvalue name
+
+        self.chunks.append(chunk)
 
         return chunk
         
@@ -226,21 +254,23 @@ class LuaCompiler:
         self.index = 4
         
         self.vm_version = self.get_byte()
-        self.offical_bytecode = self.get_byte()
+        self.bytecode_format = self.get_byte()
         self.big_endian = (self.get_byte() == 0)
         self.int_size   = self.get_byte()
         self.size_t     = self.get_byte()
-        self.thing      = self.get_string(3)
+        self.instr_size = self.get_byte() # gets size of instructions
+        self.l_number_size = self.get_byte() # size of lua_Number
+        self.integral_flag = self.get_byte()
         
 
         print("Lua VM version: ", hex(self.vm_version))
         print("Big Endian: ", self.big_endian)
         print("int_size: ", self.int_size)
         print("size_t: ", self.size_t)
-        print(self.thing)
 
         #print(self.bytecode)
-        return self.decode_chunk()
+        self.chunk = self.decode_chunk()
+        return self.chunk
         
     def compileC(self, luafile):
         os.system(self.luac + " " + self.o_flag + " " + self.temp_out + " " + luafile)
@@ -248,4 +278,7 @@ class LuaCompiler:
         with open(self.temp_out, 'rb') as luac_file:
             bytecode = luac_file.read()
             return self.decode_rawbytecode(bytecode)
+
+    def print_dissassembly(self):
+        LuaCompiler.dis_chunk(self.chunk)
 
