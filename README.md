@@ -10,15 +10,30 @@ chunk = lc.compileC("test.lua")
 
 print("\n===== [[Disassembly]] =====\n")
 
-for z in chunk['INSTRUCTIONS']:
-    i = chunk['INSTRUCTIONS'][z]
-    if (i['TYPE'] == "ABC"):
-        print(luac.lua_opcode_names[i['OPCODE']], i['A'], i['B'], i['C'])
-    elif (i['TYPE'] == "ABx"):
-        if (i['OPCODE'] == 1 or i['OPCODE'] == 5):
-            print(luac.lua_opcode_names[i['OPCODE']], i['A'], -i['Bx']-1, chunk['CONSTANTS'][i['Bx']]['DATA'])
-        else:
-            print(luac.lua_opcode_names[i['OPCODE']], i['A'], -i['Bx']-1)
+def dis_chunk(chunk):
+    print("==== [[" + str(chunk['NAME']) + "]] ====\n")
+    for z in chunk['PROTOTYPES']:
+        print("** decoding proto\n")
+        dis_chunk(chunk['PROTOTYPES'][z])
+    
+    print("\n==== [[" + str(chunk['NAME']) + "'s constants]] ====\n")
+    for z in chunk['CONSTANTS']:
+        i = chunk['CONSTANTS'][z]
+        print(str(z) + ": " + str(i['DATA']))
+
+    print("\n==== [[" + str(chunk['NAME']) + "'s dissassembly]] ====\n")
+
+    for z in chunk['INSTRUCTIONS']:
+        i = chunk['INSTRUCTIONS'][z]
+        if (i['TYPE'] == "ABC"):
+            print(luac.lua_opcode_names[i['OPCODE']], i['A'], i['B'], i['C'])
+        elif (i['TYPE'] == "ABx"):
+            if (i['OPCODE'] == 1 or i['OPCODE'] == 5):
+                print(luac.lua_opcode_names[i['OPCODE']], i['A'], -i['Bx']-1, chunk['CONSTANTS'][i['Bx']]['DATA'])
+            else:
+                print(luac.lua_opcode_names[i['OPCODE']], i['A'], -i['Bx']-1)
+                
+dis_chunk(chunk)
 ```
 
 or just parse lua bytecode
