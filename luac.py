@@ -1,4 +1,3 @@
-import os
 import struct
 import array
 
@@ -49,11 +48,8 @@ def get_bits(num, p, k):
     # convert extracted sub-string into decimal again 
     return (int(kBitSubStr,2)) 
 
-class LuaCompiler:
+class LuaUndump:
     def __init__(self):
-        self.luac = "luac5.1"
-        self.o_flag = "-o"
-        self.temp_out = "out.luac"
         self.chunks = []
         self.chunk = {}
         self.index = 0
@@ -63,7 +59,7 @@ class LuaCompiler:
         print("==== [[" + str(chunk['NAME']) + "]] ====\n")
         for z in chunk['PROTOTYPES']:
             print("** decoding proto\n")
-            LuaCompiler.dis_chunk(chunk['PROTOTYPES'][z])
+            LuaUndump.dis_chunk(chunk['PROTOTYPES'][z])
         
         print("\n==== [[" + str(chunk['NAME']) + "'s constants]] ====\n")
         for z in chunk['CONSTANTS']:
@@ -261,13 +257,11 @@ class LuaCompiler:
         self.chunk = self.decode_chunk()
         return self.chunk
         
-    def compileC(self, luafile):
-        os.system(self.luac + " " + self.o_flag + " " + self.temp_out + " " + luafile)
-
-        with open(self.temp_out, 'rb') as luac_file:
+    def loadFile(self, luaCFile):
+        with open(luaCFile, 'rb') as luac_file:
             bytecode = luac_file.read()
             return self.decode_rawbytecode(bytecode)
 
     def print_dissassembly(self):
-        LuaCompiler.dis_chunk(self.chunk)
+        LuaUndump.dis_chunk(self.chunk)
 
