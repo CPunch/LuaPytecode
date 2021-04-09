@@ -83,56 +83,46 @@ class LuaCompiler:
                     print(lua_opcode_names[i['OPCODE']], i['A'], -i['Bx']-1)
             elif (i['TYPE'] == "AsBx"):
                 print("AsBx", lua_opcode_names[i['OPCODE']], i['A'], i['sBx'])
+    
+    def loadBlock(self, sz):
+        temp = bytearray(self.bytecode[self.index:self.index+sz])
+        self.index = self.index + sz
+        return temp
 
     def get_byte(self):
-        b = self.bytecode[self.index]
-        self.index = self.index + 1
-        return b
+        return self.loadBlock(1)[0]
 
     def get_int32(self):
-        i = 0
         if (self.big_endian):
-            i = int.from_bytes(self.bytecode[self.index:self.index+4], byteorder='big', signed=False)
+            return int.from_bytes(self.loadBlock(4), byteorder='big', signed=False)
         else:
-            i = int.from_bytes(self.bytecode[self.index:self.index+4], byteorder='little', signed=False)
-        self.index = self.index + self.int_size
-        return i
+            return int.from_bytes(self.loadBlock(4), byteorder='little', signed=False)
 
     def get_int(self):
-        i = 0
         if (self.big_endian):
-            i = int.from_bytes(self.bytecode[self.index:self.index+self.int_size], byteorder='big', signed=False)
+            return int.from_bytes(self.loadBlock(self.int_size), byteorder='big', signed=False)
         else:
-            i = int.from_bytes(self.bytecode[self.index:self.index+self.int_size], byteorder='little', signed=False)
-        self.index = self.index + self.int_size
-        return i
+            return int.from_bytes(self.loadBlock(self.int_size), byteorder='little', signed=False)
 
     def get_size_t(self):
-        s = ''
         if (self.big_endian):
-            s = int.from_bytes(self.bytecode[self.index:self.index+self.size_t], byteorder='big', signed=False)
+            return int.from_bytes(self.loadBlock(self.size_t), byteorder='big', signed=False)
         else:
-            s = int.from_bytes(self.bytecode[self.index:self.index+self.size_t], byteorder='little', signed=False)
-        self.index = self.index + self.size_t
-        return s
+            return int.from_bytes(self.loadBlock(self.size_t), byteorder='little', signed=False)
 
     def get_double(self):
         if self.big_endian:
-            f = struct.unpack('>d', bytearray(self.bytecode[self.index:self.index+8]))
+            return struct.unpack('>d', self.loadBlock(8))[0]
         else:
-            f = struct.unpack('<d', bytearray(self.bytecode[self.index:self.index+8]))
-        self.index = self.index + 8
-        return f[0]
+            return struct.unpack('<d', self.loadBlock(8))[0]
 
     def get_string(self, size):
         if (size == None):
             size = self.get_size_t()
             if (size == 0):
                 return None
-        
-        s = "".join(chr(x) for x in self.bytecode[self.index:self.index+size])
-        self.index = self.index + size
-        return s
+
+        return "".join(chr(x) for x in self.loadBlock(size))
 
     def decode_chunk(self):
         chunk = {
@@ -261,7 +251,6 @@ class LuaCompiler:
         self.instr_size = self.get_byte() # gets size of instructions
         self.l_number_size = self.get_byte() # size of lua_Number
         self.integral_flag = self.get_byte()
-        
 
         print("Lua VM version: ", hex(self.vm_version))
         print("Big Endian: ", self.big_endian)
