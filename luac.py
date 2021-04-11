@@ -39,8 +39,8 @@ def get_bits(num, p, k):
     for i in range(32 - len(binary)):
         binary = '0' + binary
 
-    end = len(binary) - p + 1
-    start = len(binary) - k + 1
+    end = len(binary) - p
+    start = len(binary) - k
 
     # extract k  bit sub-string 
     kBitSubStr = binary[start : end] 
@@ -151,7 +151,7 @@ class LuaUndump:
             }
 
             data   = self.get_int32()
-            opcode = get_bits(data, 1, 6)
+            opcode = get_bits(data, 0, 6)
             tp   = lua_opcode_types[opcode]
 
             instruction['OPCODE'] = opcode
@@ -159,12 +159,12 @@ class LuaUndump:
             instruction['A'] = get_bits(data, 7, 14)
 
             if instruction['TYPE'] == "ABC":
-                instruction['B'] = get_bits(data, 24, 32)
+                instruction['B'] = get_bits(data, 24, 31)
                 instruction['C'] = get_bits(data, 15, 23)
             elif instruction['TYPE'] == "ABx":
-                instruction['Bx'] = get_bits(data, 15, 32)
+                instruction['Bx'] = get_bits(data, 15, 31)
             elif instruction['TYPE'] == "AsBx":
-                instruction['sBx'] = get_bits(data, 15, 32) - 131071
+                instruction['sBx'] = get_bits(data, 15, 31) - 131071
 
             chunk['INSTRUCTIONS'][i] = instruction
 
