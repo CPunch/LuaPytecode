@@ -1,7 +1,17 @@
+'''
+    Luac.py
+
+    A Lua5.1 cross-platform bytecode deserializer. This module pulls int and size_t sizes from the
+    chunk header, meaning it should be able to deserialize lua bytecode dumps from most platforms,
+    regardless of the host machine.
+
+    For details on the Lua5.1 bytecode format, I read [this PDF](https://archive.org/download/a-no-frills-intro-to-lua-5.1-vm-instructions/a-no-frills-intro-to-lua-5.1-vm-instructions_archive.torrent)
+    as well as read the lundump.c source file from the Lua5.1 source.
+'''
+
 import struct
 import array
 from enum import IntEnum, Enum, auto
-
 
 class InstructionType(Enum):
     ABC = auto(),
