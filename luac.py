@@ -1,34 +1,94 @@
 import struct
 import array
+from enum import IntEnum, Enum, auto
 
-lua_opcode_types = [
-    "ABC",  "ABx", "ABC",  "ABC",
-    "ABC",  "ABx", "ABC",  "ABx",
-    "ABC",  "ABC", "ABC",  "ABC",
-    "ABC",  "ABC", "ABC",  "ABC",
-    "ABC",  "ABC", "ABC",  "ABC",
-    "ABC",  "ABC", "AsBx", "ABC",
-    "ABC",  "ABC", "ABC",  "ABC",
-    "ABC",  "ABC", "ABC",  "AsBx",
-    "AsBx", "ABC", "ABC", "ABC",
-    "ABx",  "ABC"
+
+class InstructionType(Enum):
+    ABC = auto(),
+    ABx = auto(),
+    AsBx = auto()
+
+class ConstType(IntEnum):
+    NIL     = 0,
+    BOOL    = 1,
+    NUMBER  = 3,
+    STRING  = 4,
+
+class Instruction:
+    def __init__(self, type: InstructionType, name: str) -> None:
+        self.type = type
+        self.name = name
+        self.opcode: int = None
+        self.A: int = None
+        self.B: int = None
+        self.C: int = None
+
+    def toString(self):
+        instr = "%10s" % self.name
+        regs = ""
+
+        if self.type == InstructionType.ABC:
+            regs = "%d %d %d" % (self.A, self.B, self.C) 
+        elif self.type == InstructionType.ABx or self.type == InstructionType.AsBx:
+            regs = "%d %d" % (self.A, self.B)
+
+        return "%s : %s" % (instr, regs)
+
+class Constant:
+    def __init__(self, type: ConstType, data) -> None:
+        self.type = type
+        self.data = data
+
+class Local:
+    def __init(self, name: str, start: int, end: int):
+        self.name = name
+        self.start = start
+        self.end = end
+
+class Chunk:
+    def __init__(self) -> None:
+        self.constants: list[Constant] = []
+        self.instructions: list[Instruction] = []
+        self.protos: list[Chunk] = []
+
+        self.name: str = "Unnamed proto"
+        self.frst_line: int = 0
+        self.last_line: int = 0
+        self.numUpvals: int = 0
+        self.numParams: int = 0
+        self.isVarg: bool = False
+        self.maxStack: int = 0
+
+        self.upvalues: list[str] = []
+        self.locals: list[Local] = []
+
+    def appendInstruction(self, instr: Instruction):
+        self.instructions.append(instr)
+
+    def appendConstant(self, const: Constant):
+        self.constants.append(const)
+
+    def appendProto(self, proto):
+        self.protos.append(proto)
+
+instr_lookup_tbl = [
+    Instruction(InstructionType.ABC, "MOVE"),  Instruction(InstructionType.ABx, "LOADK"), Instruction(InstructionType.ABC, "LOADBOOL"),
+    Instruction(InstructionType.ABC, "LOADNIL"), Instruction(InstructionType.ABC, "GETUPVAL"), Instruction(InstructionType.ABx, "GETGLOBAL"),
+    Instruction(InstructionType.ABC, "GETTABLE"), Instruction(InstructionType.ABx, "SETGLOBAL"), Instruction(InstructionType.ABC, "SETUPVAL"),
+    Instruction(InstructionType.ABC, "SETTABLE"), Instruction(InstructionType.ABC, "NEWTABLE"), Instruction(InstructionType.ABC, "SELF"),
+    Instruction(InstructionType.ABC, "ADD"), Instruction(InstructionType.ABC, "SUB"), Instruction(InstructionType.ABC, "MUL"),
+    Instruction(InstructionType.ABC, "DIV"), Instruction(InstructionType.ABC, "MOD"), Instruction(InstructionType.ABC, "POW"),
+    Instruction(InstructionType.ABC, "UNM"), Instruction(InstructionType.ABC, "NOT"), Instruction(InstructionType.ABC, "LEN"),
+    Instruction(InstructionType.ABC, "CONCAT"), Instruction(InstructionType.AsBx, "JMP"), Instruction(InstructionType.ABC, "EQ"),
+    Instruction(InstructionType.ABC, "LT"), Instruction(InstructionType.ABC, "LE"), Instruction(InstructionType.ABC, "TEST"),
+    Instruction(InstructionType.ABC, "TESTSET"), Instruction(InstructionType.ABC, "CALL"), Instruction(InstructionType.ABC, "TAILCALL"),
+    Instruction(InstructionType.ABC, "RETURN"), Instruction(InstructionType.AsBx, "FORLOOP"), Instruction(InstructionType.AsBx, "FORPREP"),
+    Instruction(InstructionType.ABC, "TFORLOOP"), Instruction(InstructionType.ABC, "SETLIST"), Instruction(InstructionType.ABC, "CLOSE"),
+    Instruction(InstructionType.ABx, "CLOSURE"), Instruction(InstructionType.ABC, "VARARG")
 ]
 
-lua_opcode_names = [
-    "MOVE",     "LOADK",     "LOADBOOL", "LOADNIL",
-    "GETUPVAL", "GETGLOBAL", "GETTABLE", "SETGLOBAL",
-    "SETUPVAL", "SETTABLE",  "NEWTABLE", "SELF",
-    "ADD",      "SUB",       "MUL",      "DIV",
-    "MOD",      "POW",       "UNM",      "NOT",
-    "LEN",      "CONCAT",    "JMP",      "EQ",
-    "LT",       "LE",        "TEST",     "TESTSET",
-    "CALL",     "TAILCALL",  "RETURN",   "FORLOOP",
-    "FORPREP",  "TFORLOOP",  "SETLIST",  "CLOSE",
-    "CLOSURE",  "VARARG"
-]
-
-# at [p]osition to k
-def get_bits(num, p, k):
+# at [p]osition, with [s]ize of bits
+def _get_bits(num, p, s):
     # convert number into binary first 
     binary = bin(num) 
 
@@ -39,169 +99,137 @@ def get_bits(num, p, k):
     for i in range(32 - len(binary)):
         binary = '0' + binary
 
+    start = len(binary) - (p+s)
     end = len(binary) - p
-    start = len(binary) - k
 
     # extract k  bit sub-string 
-    kBitSubStr = binary[start : end] 
+    kBitSubStr = binary[start : end]
 
     # convert extracted sub-string into decimal again 
-    return (int(kBitSubStr,2)) 
+    return (int(kBitSubStr,2))
 
 class LuaUndump:
     def __init__(self):
-        self.chunks = []
-        self.chunk = {}
+        self.rootChunk: Chunk = None
         self.index = 0
 
     @staticmethod
-    def dis_chunk(chunk):
-        print("==== [[" + str(chunk['NAME']) + "]] ====\n")
-        for z in chunk['PROTOTYPES']:
+    def dis_chunk(chunk: Chunk):
+        print("\n==== [[" + str(chunk.name) + "'s constants]] ====\n")
+        for z in range(len(chunk.constants)):
+            i = chunk.constants[z]
+            print(str(z) + ": [" + i.type.name + "] " + str(i.data))
+
+        print("\n==== [[" + str(chunk.name) + "'s dissassembly]] ====\n")
+        for i in range(len(chunk.instructions)):
+            print("[%3d] %s" % (i, chunk.instructions[i].toString()))
+
+        print("\n==== [[" + str(chunk.name) + "'s protos]] ====\n")
+        for z in chunk.protos:
             print("** decoding proto\n")
-            LuaUndump.dis_chunk(chunk['PROTOTYPES'][z])
-        
-        print("\n==== [[" + str(chunk['NAME']) + "'s constants]] ====\n")
-        for z in chunk['CONSTANTS']:
-            i = chunk['CONSTANTS'][z]
-            print(str(z) + ": " + str(i['DATA']))
-
-        print("\n==== [[" + str(chunk['NAME']) + "'s dissassembly]] ====\n")
-
-        for z in chunk['INSTRUCTIONS']:
-            i = chunk['INSTRUCTIONS'][z]
-            if (i['TYPE'] == "ABC"):
-                print(lua_opcode_names[i['OPCODE']], i['A'], i['B'], i['C'])
-            elif (i['TYPE'] == "ABx"):
-                if (i['OPCODE'] == 1 or i['OPCODE'] == 5):
-                    print(lua_opcode_names[i['OPCODE']], i['A'], -i['Bx']-1, chunk['CONSTANTS'][i['Bx']]['DATA'])
-                else:
-                    print(lua_opcode_names[i['OPCODE']], i['A'], -i['Bx']-1)
-            elif (i['TYPE'] == "AsBx"):
-                print("AsBx", lua_opcode_names[i['OPCODE']], i['A'], i['sBx'])
+            LuaUndump.dis_chunk(z)
     
-    def loadBlock(self, sz):
+    def loadBlock(self, sz) -> bytearray:
         temp = bytearray(self.bytecode[self.index:self.index+sz])
         self.index = self.index + sz
         return temp
 
-    def get_byte(self):
+    def get_byte(self) -> int:
         return self.loadBlock(1)[0]
 
-    def get_int32(self):
+    def get_int32(self) -> int:
         if (self.big_endian):
             return int.from_bytes(self.loadBlock(4), byteorder='big', signed=False)
         else:
             return int.from_bytes(self.loadBlock(4), byteorder='little', signed=False)
 
-    def get_int(self):
+    def get_int(self) -> int:
         if (self.big_endian):
             return int.from_bytes(self.loadBlock(self.int_size), byteorder='big', signed=False)
         else:
             return int.from_bytes(self.loadBlock(self.int_size), byteorder='little', signed=False)
 
-    def get_size_t(self):
+    def get_size_t(self) -> int:
         if (self.big_endian):
             return int.from_bytes(self.loadBlock(self.size_t), byteorder='big', signed=False)
         else:
             return int.from_bytes(self.loadBlock(self.size_t), byteorder='little', signed=False)
 
-    def get_double(self):
+    def get_double(self) -> int:
         if self.big_endian:
             return struct.unpack('>d', self.loadBlock(8))[0]
         else:
             return struct.unpack('<d', self.loadBlock(8))[0]
 
-    def get_string(self, size):
+    def get_string(self, size) -> str:
         if (size == None):
             size = self.get_size_t()
             if (size == 0):
-                return None
+                return ""
 
         return "".join(chr(x) for x in self.loadBlock(size))
 
     def decode_chunk(self):
-        chunk = {
-            'INSTRUCTIONS': {},
-            'CONSTANTS': {},
-            'PROTOTYPES': {}
-        }
+        chunk = Chunk()
 
-        chunk['NAME'] = self.get_string(None)
-        chunk['FIRST_LINE'] = self.get_int()
-        chunk['LAST_LINE'] = self.get_int()
+        chunk.name = self.get_string(None)
+        chunk.frst_line = self.get_int()
+        chunk.last_line = self.get_int()
 
-        chunk['UPVALUES'] = self.get_byte()
-        chunk['ARGUMENTS'] = self.get_byte()
-        chunk['VARG'] = self.get_byte()
-        chunk['STACK'] = self.get_byte()
+        chunk.numUpvals = self.get_byte()
+        chunk.numParams = self.get_byte()
+        chunk.isVarg = (self.get_byte() != 0)
+        chunk.maxStack = self.get_byte()
 
-        if (not chunk['NAME'] == None):
-            chunk['NAME'] = chunk['NAME'][1:-1]
+        if (not chunk.name == ""):
+            chunk.name = chunk.name[1:-1]
 
         # parse instructions
-        print("** DECODING INSTRUCTIONS")
-
         num = self.get_int()
         for i in range(num):
-            instruction = {
-                # opcode = opcode number;
-                # type   = [ABC, ABx, AsBx]
-                # A, B, C, Bx, or sBx depending on type
-            }
-
             data   = self.get_int32()
-            opcode = get_bits(data, 0, 6)
-            tp   = lua_opcode_types[opcode]
+            opcode = _get_bits(data, 0, 6)
+            template = instr_lookup_tbl[opcode]
+            instruction = Instruction(template.type, template.name)
 
-            instruction['OPCODE'] = opcode
-            instruction['TYPE'] = tp
-            instruction['A'] = get_bits(data, 7, 14)
+            instruction.opcode = opcode
+            instruction.A = _get_bits(data, 6, 8)
 
-            if instruction['TYPE'] == "ABC":
-                instruction['B'] = get_bits(data, 24, 31)
-                instruction['C'] = get_bits(data, 15, 23)
-            elif instruction['TYPE'] == "ABx":
-                instruction['Bx'] = get_bits(data, 15, 31)
-            elif instruction['TYPE'] == "AsBx":
-                instruction['sBx'] = get_bits(data, 15, 31) - 131071
+            if instruction.type == InstructionType.ABC:
+                instruction.B = _get_bits(data, 23, 9)
+                instruction.C = _get_bits(data, 14, 9)
+            elif instruction.type == InstructionType.ABx:
+                instruction.B = _get_bits(data, 14, 18)
+            elif instruction.type == InstructionType.AsBx:
+                instruction.B = _get_bits(data, 14, 18) - 131071
 
-            chunk['INSTRUCTIONS'][i] = instruction
-
-            print(lua_opcode_names[opcode], instruction)
+            chunk.appendInstruction(instruction)
 
         # get constants
-        print("** DECODING CONSTANTS")
-
         num = self.get_int()
         for i in range(num):
-            constant = {
-                # type = constant type;
-                # data = constant data;
-            }
-            constant['TYPE'] = self.get_byte()
+            constant: Constant = None
+            type = self.get_byte()
 
-            if constant['TYPE'] == 1:
-                constant['DATA'] = (self.get_byte() != 0)
-            elif constant['TYPE'] == 3:
-                constant['DATA'] = self.get_double()
-            elif constant['TYPE'] == 4:
-                constant['DATA'] = self.get_string(None)[:-1]
+            if type == 0: #nil
+                constant = Constant(ConstType.NIL, None)
+            elif type == 1: # bool
+                constant = Constant(ConstType.BOOL, (self.get_byte() != 0))
+            elif type == 3: # number
+                constant = Constant(ConstType.NUMBER, self.get_double())
+            elif type == 4: # string
+                constant = Constant(ConstType.STRING, self.get_string(None)[:-1])
+            else:
+                raise Exception("Unknown Datatype! [%d]" % type)
 
-            print(constant)
-            
-            chunk['CONSTANTS'][i] = constant
+            chunk.appendConstant(constant)
 
         # parse protos
-
-        print("** DECODING PROTOS")
-
         num = self.get_int()
         for i in range(num):
-            chunk['PROTOTYPES'][i] = self.decode_chunk()
+            chunk.appendProto(self.decode_chunk())
 
         # debug stuff
-        print("** DECODING DEBUG SYMBOLS")
 
         # line numbers
         num = self.get_int()
@@ -211,7 +239,7 @@ class LuaUndump:
         # locals
         num = self.get_int()
         for i in range(num):
-            print(self.get_string(None)[:-1]) # local name
+            #print(self.get_string(None)[:-1]) # local name
             self.get_int32() # local start PC
             self.get_int32() # local end   PC
 
@@ -220,23 +248,20 @@ class LuaUndump:
         for i in range(num):
             self.get_string(None) # upvalue name
 
-        self.chunks.append(chunk)
-
         return chunk
         
     def decode_rawbytecode(self, rawbytecode):
         # bytecode sanity checks
         if not rawbytecode[0:4] == b'\x1bLua':
-            print("Lua Bytecode expected!")
-            exit(0)
-            
-        bytecode   = array.array('b', rawbytecode)
+            raise Exception("Lua Bytecode expected!")
+
+        bytecode = array.array('b', rawbytecode)
         return self.decode_bytecode(bytecode)
 
     def decode_bytecode(self, bytecode):
         self.bytecode   = bytecode
 
-        # alligns index lol
+        # aligns index, skips header
         self.index = 4
         
         self.vm_version = self.get_byte()
@@ -248,14 +273,8 @@ class LuaUndump:
         self.l_number_size = self.get_byte() # size of lua_Number
         self.integral_flag = self.get_byte()
 
-        print("Lua VM version: ", hex(self.vm_version))
-        print("Big Endian: ", self.big_endian)
-        print("int_size: ", self.int_size)
-        print("size_t: ", self.size_t)
-
-        #print(self.bytecode)
-        self.chunk = self.decode_chunk()
-        return self.chunk
+        self.rootChunk = self.decode_chunk()
+        return self.rootChunk
         
     def loadFile(self, luaCFile):
         with open(luaCFile, 'rb') as luac_file:
@@ -263,5 +282,5 @@ class LuaUndump:
             return self.decode_rawbytecode(bytecode)
 
     def print_dissassembly(self):
-        LuaUndump.dis_chunk(self.chunk)
+        LuaUndump.dis_chunk(self.rootChunk)
 
