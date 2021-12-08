@@ -39,6 +39,9 @@ class Constant:
         self.type = type
         self.data = data
 
+    def toString(self):
+        return "[" + self.type.name + "] " + str(self.data)
+
 class Local:
     def __init(self, name: str, start: int, end: int):
         self.name = name
@@ -70,6 +73,20 @@ class Chunk:
 
     def appendProto(self, proto):
         self.protos.append(proto)
+
+    def print(self):
+        print("\n==== [[" + str(self.name) + "'s constants]] ====\n")
+        for z in range(len(self.constants)):
+            i = self.constants[z]
+            print(str(z) + ": " + i.toString())
+
+        print("\n==== [[" + str(self.name) + "'s dissassembly]] ====\n")
+        for i in range(len(self.instructions)):
+            print("[%3d] %s" % (i, self.instructions[i].toString()))
+
+        print("\n==== [[" + str(self.name) + "'s protos]] ====\n")
+        for z in self.protos:
+            z.print()
 
 instr_lookup_tbl = [
     Instruction(InstructionType.ABC, "MOVE"),  Instruction(InstructionType.ABx, "LOADK"), Instruction(InstructionType.ABC, "LOADBOOL"),
@@ -115,21 +132,12 @@ class LuaUndump:
 
     @staticmethod
     def dis_chunk(chunk: Chunk):
-        print("\n==== [[" + str(chunk.name) + "'s constants]] ====\n")
-        for z in range(len(chunk.constants)):
-            i = chunk.constants[z]
-            print(str(z) + ": [" + i.type.name + "] " + str(i.data))
-
-        print("\n==== [[" + str(chunk.name) + "'s dissassembly]] ====\n")
-        for i in range(len(chunk.instructions)):
-            print("[%3d] %s" % (i, chunk.instructions[i].toString()))
-
-        print("\n==== [[" + str(chunk.name) + "'s protos]] ====\n")
-        for z in chunk.protos:
-            print("** decoding proto\n")
-            LuaUndump.dis_chunk(z)
+        chunk.print()
     
     def loadBlock(self, sz) -> bytearray:
+        if self.index + sz > len(self.bytecode):
+            raise Exception("Malformed bytecode!")
+
         temp = bytearray(self.bytecode[self.index:self.index+sz])
         self.index = self.index + sz
         return temp
@@ -234,14 +242,14 @@ class LuaUndump:
         # line numbers
         num = self.get_int()
         for i in range(num):
-            self.get_int32()
+            self.get_int()
 
         # locals
         num = self.get_int()
         for i in range(num):
-            #print(self.get_string(None)[:-1]) # local name
-            self.get_int32() # local start PC
-            self.get_int32() # local end   PC
+            self.get_string(None)[:-1] # local name
+            self.get_int() # local start PC
+            self.get_int() # local end   PC
 
         # upvalues
         num = self.get_int()
