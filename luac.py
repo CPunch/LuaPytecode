@@ -210,16 +210,17 @@ class LuaUndump:
             template = instr_lookup_tbl[opcode]
             instruction = Instruction(template.type, template.name)
 
+            # i read the lopcodes.h file to get these bit position and sizes.
             instruction.opcode = opcode
-            instruction.A = _get_bits(data, 6, 8)
+            instruction.A = _get_bits(data, 6, 8) # starts after POS_OP + SIZE_OP (6), with a size of 8
 
             if instruction.type == InstructionType.ABC:
-                instruction.B = _get_bits(data, 23, 9)
-                instruction.C = _get_bits(data, 14, 9)
+                instruction.B = _get_bits(data, 23, 9) # starts after POS_C + SIZE_C (23), with a size of 9
+                instruction.C = _get_bits(data, 14, 9) # starts after POS_A + SIZE_A (14), with a size of 9
             elif instruction.type == InstructionType.ABx:
-                instruction.B = _get_bits(data, 14, 18)
+                instruction.B = _get_bits(data, 14, 18) # starts after POS_A + SIZE_A (14), with a size of 18
             elif instruction.type == InstructionType.AsBx:
-                instruction.B = _get_bits(data, 14, 18) - 131071
+                instruction.B = _get_bits(data, 14, 18) - 131071 # Bx is now signed, so just sub half of the MAX_UINT for 18 bits
 
             chunk.appendInstruction(instruction)
 
@@ -247,7 +248,8 @@ class LuaUndump:
         for i in range(num):
             chunk.appendProto(self.decode_chunk())
 
-        # debug stuff
+        # debug stuff, maybe i'll add this to chunks to have better disassembly annotation in the future?
+        # eh, for now just consume the bytes.
 
         # line numbers
         num = self.get_int()
