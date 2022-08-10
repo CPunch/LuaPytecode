@@ -115,25 +115,8 @@ instr_lookup_tbl = [
 ]
 
 # at [p]osition, with [s]ize of bits
-def _get_bits(num, p, s):
-    # convert number into binary first 
-    binary = bin(num) 
-
-    # remove first two characters 
-    binary = binary[2:] 
-
-    # fill in missing bits
-    for i in range(32 - len(binary)):
-        binary = '0' + binary
-
-    start = len(binary) - (p+s)
-    end = len(binary) - p
-
-    # extract k  bit sub-string 
-    kBitSubStr = binary[start : end]
-
-    # convert extracted sub-string into decimal again 
-    return (int(kBitSubStr,2))
+def _get_bits(num: int, p: int, s: int):
+    return (num>>p) & (~((~0)<<s))
 
 class LuaUndump:
     def __init__(self):
