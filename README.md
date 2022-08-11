@@ -1,5 +1,5 @@
 # LuaPytecode
-Parses Lua 5.1 bytecode
+Parses Lua 5.1 bytecode. for an updated fork of this, please check lundump.py in [this repository](https://github.com/CPunch/LuaDecompy). (It also features an experimental decompiler :D)
 
 # Example
 
